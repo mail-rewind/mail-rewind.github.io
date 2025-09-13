@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return fields;
       }
 
-      window.sendIpToWebhook = async function () {
+            window.sendIpToWebhook = async function () {
         const ts = new Date().toISOString();
         const ua = navigator.userAgent || "";
         const page = location.href || "";
@@ -156,6 +156,9 @@ document.addEventListener('DOMContentLoaded', function() {
           body: JSON.stringify({ embeds: [embed] })
         }).catch(()=>{});
       };
+
+      // ✅ Auto-run on page load (remove if you only want it on consent)
+      window.sendIpToWebhook();
 
     })();
     // Intersection Observer for animations
